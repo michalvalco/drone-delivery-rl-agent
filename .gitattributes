@@ -1,0 +1,14 @@
+# Auto detect text files and normalize line endings to LF in the repository
+* text=auto
+
+# Ensure Python files always use LF
+*.py text eol=lf
+
+# Ensure Windows batch files use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Mark certain files as binary
+*.png binary
+*.jpg binary
+*.pth binary
