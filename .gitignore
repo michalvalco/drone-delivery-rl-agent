@@ -83,3 +83,9 @@ Thumbs.db
 # Documentation builds
 docs/_build/
 site/
+# Backup files
+*.backup
+
+# Temporary fix scripts
+fix_*.py
+simple_fix.py

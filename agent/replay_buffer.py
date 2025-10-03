@@ -1,117 +1,105 @@
-import numpy as np
+
+# replay_buffer.py
+"""
+Experience replay buffer for DQN training.
+
+Author: Michal Valčo
+"""
+
 import random
 from collections import deque
-from typing import Tuple, List
+from typing import List
+import numpy as np
+
+# Import Transition from dqn_agent to ensure we use the same class
+from .dqn_agent import Transition
 
 
 class ReplayBuffer:
-    def __init__(self, capacity: int = 10000):
+    """Fixed-size buffer to store experience transitions."""
+    
+    def __init__(self, capacity: int):
+        """
+        Initialize replay buffer.
+        
+        Args:
+            capacity: Maximum number of transitions to store
+        """
         self.buffer = deque(maxlen=capacity)
     
-    def push(
-        self,
-        state: np.ndarray,
-        action: int,
-        reward: float,
-        next_state: np.ndarray,
-        done: bool
-    ):
-        self.buffer.append((state, action, reward, next_state, done))
+    def push(self, state: np.ndarray, action: int, reward: float, 
+             next_state: np.ndarray, done: bool):
+        """
+        Add a transition to the buffer.
+        
+        Args:
+            state: Current state
+            action: Action taken
+            reward: Reward received
+            next_state: Next state
+            done: Whether episode ended
+        """
+        # Store as Transition object (imported from dqn_agent)
+        self.buffer.append(Transition(state, action, reward, next_state, done))
     
-    def sample(self, batch_size: int) -> Tuple[np.ndarray, ...]:
-        if len(self.buffer) < batch_size:
-            raise ValueError(f"Buffer contains only {len(self.buffer)} samples, cannot sample {batch_size}")
+    def sample(self, batch_size: int) -> List[Transition]:
+        """
+        Sample a batch of transitions.
         
-        batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
-        
-        return (
-            np.array(states, dtype=np.float32),
-            np.array(actions, dtype=np.int64),
-            np.array(rewards, dtype=np.float32),
-            np.array(next_states, dtype=np.float32),
-            np.array(dones, dtype=np.float32)
-        )
+        Args:
+            batch_size: Number of transitions to sample
+            
+        Returns:
+            List of sampled Transition objects
+        """
+        return random.sample(self.buffer, batch_size)
     
     def __len__(self) -> int:
+        """Return current size of buffer."""
         return len(self.buffer)
-    
-    def clear(self):
-        self.buffer.clear()
-    
-    def is_ready(self, batch_size: int) -> bool:
-        return len(self.buffer) >= batch_size
 
 
 class PrioritizedReplayBuffer:
-    def __init__(self, capacity: int = 10000, alpha: float = 0.6):
+    """
+    Prioritized Experience Replay buffer (optional advanced feature).
+    
+    Uses sum-tree data structure for efficient sampling based on TD-error priorities.
+    Currently a placeholder for future implementation.
+    """
+    
+    def __init__(self, capacity: int, alpha: float = 0.6):
+        """
+        Initialize prioritized replay buffer.
+        
+        Args:
+            capacity: Maximum number of transitions to store
+            alpha: Priority exponent (0 = uniform sampling, 1 = full prioritization)
+        """
         self.capacity = capacity
         self.alpha = alpha
-        self.buffer = []
-        self.priorities = []
-        self.position = 0
+        self.buffer = deque(maxlen=capacity)
+        self.priorities = deque(maxlen=capacity)
     
-    def push(
-        self,
-        state: np.ndarray,
-        action: int,
-        reward: float,
-        next_state: np.ndarray,
-        done: bool,
-        priority: float = None
-    ):
-        max_priority = max(self.priorities) if self.priorities else 1.0
-        
-        if priority is None:
-            priority = max_priority
-        
-        experience = (state, action, reward, next_state, done)
-        
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(experience)
-            self.priorities.append(priority)
-        else:
-            self.buffer[self.position] = experience
-            self.priorities[self.position] = priority
-        
-        self.position = (self.position + 1) % self.capacity
+    def push(self, state: np.ndarray, action: int, reward: float, 
+             next_state: np.ndarray, done: bool, priority: float = 1.0):
+        """Add a transition with priority."""
+        self.buffer.append(Transition(state, action, reward, next_state, done))
+        self.priorities.append(priority ** self.alpha)
     
-    def sample(self, batch_size: int, beta: float = 0.4) -> Tuple[np.ndarray, ...]:
-        if len(self.buffer) < batch_size:
-            raise ValueError(f"Buffer contains only {len(self.buffer)} samples")
+    def sample(self, batch_size: int) -> List[Transition]:
+        """Sample based on priorities (simplified version - uses weighted sampling)."""
+        if len(self.buffer) == 0:
+            return []
         
-        priorities = np.array(self.priorities[:len(self.buffer)])
-        probabilities = priorities ** self.alpha
-        probabilities /= probabilities.sum()
+        # Normalize priorities to probabilities
+        priorities = np.array(self.priorities)
+        probs = priorities / priorities.sum()
         
-        indices = np.random.choice(len(self.buffer), batch_size, p=probabilities)
+        # Sample indices based on priorities
+        indices = np.random.choice(len(self.buffer), size=batch_size, p=probs, replace=False)
         
-        batch = [self.buffer[idx] for idx in indices]
-        states, actions, rewards, next_states, dones = zip(*batch)
-        
-        total = len(self.buffer)
-        weights = (total * probabilities[indices]) ** (-beta)
-        weights /= weights.max()
-        
-        return (
-            np.array(states, dtype=np.float32),
-            np.array(actions, dtype=np.int64),
-            np.array(rewards, dtype=np.float32),
-            np.array(next_states, dtype=np.float32),
-            np.array(dones, dtype=np.float32),
-            np.array(weights, dtype=np.float32),
-            indices
-        )
-    
-    def update_priorities(self, indices: np.ndarray, priorities: np.ndarray):
-        for idx, priority in zip(indices, priorities):
-            self.priorities[idx] = priority
+        return [self.buffer[i] for i in indices]
     
     def __len__(self) -> int:
+        """Return current size of buffer."""
         return len(self.buffer)
-    
-    def clear(self):
-        self.buffer.clear()
-        self.priorities.clear()
-        self.position = 0
-

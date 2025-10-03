@@ -5,7 +5,13 @@ This module contains the DQN agent implementation with experience replay
 and target network stabilization.
 """
 
-from .dqn_agent import DQNAgent, DQNNetwork
+from .dqn_agent import DQNAgent, QNetwork, Transition
 from .replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 
-__all__ = ['DQNAgent', 'DQNNetwork', 'ReplayBuffer', 'PrioritizedReplayBuffer']
+__all__ = [
+    'DQNAgent',
+    'QNetwork',
+    'Transition',
+    'ReplayBuffer',
+    'PrioritizedReplayBuffer'
+]
